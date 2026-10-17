@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /?tab=scan
+Allow: /?tab=scamometer
+Allow: /?tab=siret
+Allow: /?tab=scamwatch
+Allow: /?tab=guides
+Disallow: /api/
+
+Sitemap: https://trustlens.fr/sitemap.xml

@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local SQLite database files
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+
+# Vercel
+.vercel/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.DS_Store
+*.log

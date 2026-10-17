@@ -1,0 +1,48 @@
+{
+  "name": "TrustLens - Anti-Arnaque Marketplace",
+  "short_name": "TrustLens",
+  "description": "Vérificateur de fiabilité et détecteur d'arnaques pour revendeurs et marketplaces",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["shopping", "security", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Scanner un lien",
+      "url": "/?tab=scan",
+      "description": "Analyser une URL de boutique ou d'annonce"
+    },
+    {
+      "name": "Vérifier un SIRET",
+      "url": "/?tab=siret",
+      "description": "Vérifier une entreprise au registre officiel"
+    },
+    {
+      "name": "Signaler une arnaque",
+      "url": "/?tab=scamwatch",
+      "description": "Consulter ou déclarer une tentative d'escroquerie"
+    }
+  ]
+}

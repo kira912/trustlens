@@ -1,0 +1,61 @@
+const CACHE_NAME = 'trustlens-v3';
+const STATIC_ASSETS = [
+  '/manifest.webmanifest',
+  '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        new Response(
+          JSON.stringify({
+            error: 'Vous êtes actuellement hors-ligne. Les analyses en direct nécessitent une connexion Internet.',
+            isOffline: true,
+          }),
+          { headers: { 'Content-Type': 'application/json' }, status: 503 }
+        )
+      )
+    );
+    return;
+  }
+
+  // Network-First for HTML/navigation and JS/CSS bundles so updates are always immediate
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});
