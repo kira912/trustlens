@@ -18,7 +18,11 @@ export class HealthController {
       status: 'ok',
       service: 'TrustLens NestJS Clean Architecture API',
       version: '2.0.0',
-      database: this.db.isPostgres ? 'PostgreSQL (Drizzle ORM)' : 'SQLite Local Fallback',
+      database: this.db.isPostgres
+        ? 'PostgreSQL (Drizzle ORM)'
+        : this.db.sqliteClient
+        ? 'SQLite Local Fallback'
+        : 'Non connecté (Vérifier POSTGRES_URL ou DATABASE_URL sur Vercel)',
       environment: process.env.VERCEL ? 'vercel-serverless' : 'standalone',
       time: new Date().toISOString(),
     };

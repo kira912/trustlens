@@ -19,52 +19,57 @@ export interface LowLevelSqliteClient {
   prepare(sqlText: string): LowLevelSqliteStatement;
 }
 
-function createLowLevelSqliteClient(dbPath: string): LowLevelSqliteClient {
-  const req = createRequire(import.meta.url);
-  const isBun = typeof (globalThis as any).Bun !== 'undefined';
+function createLowLevelSqliteClient(dbPath: string): LowLevelSqliteClient | null {
+  try {
+    const req = createRequire(import.meta.url);
+    const isBun = typeof (globalThis as any).Bun !== 'undefined';
 
-  if (isBun) {
-    const bunSqliteMod = 'bun:' + 'sqlite';
-    const { Database } = req(bunSqliteMod);
-    const rawDb = new Database(dbPath);
+    if (isBun) {
+      const bunSqliteMod = 'bun:' + 'sqlite';
+      const { Database } = req(bunSqliteMod);
+      const rawDb = new Database(dbPath);
+      return {
+        run: (q: string) => rawDb.run(q),
+        exec: (q: string) => rawDb.exec(q),
+        prepare: (q: string) => {
+          const stmt = rawDb.prepare(q);
+          return {
+            run: (...params: any[]) => stmt.run(...params),
+            all: (...params: any[]) => stmt.all(...params),
+            get: (...params: any[]) => stmt.get(...params),
+          };
+        },
+      };
+    }
+
+    const nodeSqliteMod = 'node:' + 'sqlite';
+    const { DatabaseSync } = req(nodeSqliteMod);
+    const rawDb = new DatabaseSync(dbPath);
     return {
-      run: (q: string) => rawDb.run(q),
+      run: (q: string) => rawDb.exec(q),
       exec: (q: string) => rawDb.exec(q),
       prepare: (q: string) => {
         const stmt = rawDb.prepare(q);
         return {
-          run: (...params: any[]) => stmt.run(...params),
-          all: (...params: any[]) => stmt.all(...params),
-          get: (...params: any[]) => stmt.get(...params),
+          run: (...params: any[]) => {
+            stmt.setReturnArrays(false);
+            return stmt.run(...params);
+          },
+          all: (...params: any[]) => {
+            stmt.setReturnArrays(false);
+            return stmt.all(...params);
+          },
+          get: (...params: any[]) => {
+            stmt.setReturnArrays(false);
+            return stmt.get(...params);
+          },
         };
       },
     };
+  } catch (err) {
+    console.warn('SQLite fallback non disponible dans cet environnement:', err);
+    return null;
   }
-
-  const nodeSqliteMod = 'node:' + 'sqlite';
-  const { DatabaseSync } = req(nodeSqliteMod);
-  const rawDb = new DatabaseSync(dbPath);
-  return {
-    run: (q: string) => rawDb.exec(q),
-    exec: (q: string) => rawDb.exec(q),
-    prepare: (q: string) => {
-      const stmt = rawDb.prepare(q);
-      return {
-        run: (...params: any[]) => {
-          stmt.setReturnArrays(false);
-          return stmt.run(...params);
-        },
-        all: (...params: any[]) => {
-          stmt.setReturnArrays(false);
-          return stmt.all(...params);
-        },
-        get: (...params: any[]) => {
-          stmt.setReturnArrays(false);
-          return stmt.get(...params);
-        },
-      };
-    },
-  };
 }
 
 function resolveSqliteFallbackPath(): string {
@@ -98,7 +103,8 @@ export function getPostgresConnectionString(): string | null {
     process.env.POSTGRES_URL ||
     process.env.DATABASE_URL ||
     process.env.POSTGRES_PRISMA_URL ||
-    process.env.POSTGRES_URL_NON_POOLING;
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_URL_UNPOOLED;
   return url && url.trim().length > 0 ? url.trim() : null;
 }
 
@@ -151,21 +157,25 @@ export class SqliteService implements OnModuleInit {
 
     if (pgUrl) {
       this.isPostgres = true;
-      const needsSsl =
-        pgUrl.includes('sslmode=require') ||
-        pgUrl.includes('neon.tech') ||
-        pgUrl.includes('vercel-storage.com') ||
-        pgUrl.includes('supabase.co') ||
-        Boolean(process.env.VERCEL);
+      try {
+        const needsSsl =
+          pgUrl.includes('sslmode=require') ||
+          pgUrl.includes('neon.tech') ||
+          pgUrl.includes('vercel-storage.com') ||
+          pgUrl.includes('supabase.co') ||
+          Boolean(process.env.VERCEL);
 
-      this.pgClient = postgres(pgUrl, {
-        ssl: needsSsl ? 'require' : undefined,
-        max: process.env.VERCEL ? 3 : 10,
-        idle_timeout: 20,
-        connect_timeout: 10,
-        prepare: false,
-      });
-      this.pgOrm = drizzle(this.pgClient, { schema });
+        this.pgClient = postgres(pgUrl, {
+          ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+          max: process.env.VERCEL ? 3 : 10,
+          idle_timeout: 20,
+          connect_timeout: 10,
+          prepare: false,
+        });
+        this.pgOrm = drizzle(this.pgClient, { schema });
+      } catch (err) {
+        console.error('Erreur lors de l’initialisation du client PostgreSQL:', err);
+      }
     } else {
       this.isPostgres = false;
       const dbPath = resolveSqliteFallbackPath();
@@ -184,8 +194,8 @@ export class SqliteService implements OnModuleInit {
     }
     if (!this.initPromise) {
       this.initPromise = this.initPostgresSchema().catch((err) => {
+        console.error('Erreur lors de la préparation de la base PostgreSQL:', err);
         this.initPromise = null;
-        throw err;
       });
     }
     await this.initPromise;
@@ -194,7 +204,11 @@ export class SqliteService implements OnModuleInit {
   private async initPostgresSchema(): Promise<void> {
     if (!this.pgClient) return;
     for (const ddl of SCHEMA_DDL_STATEMENTS) {
-      await this.pgClient.unsafe(ddl);
+      try {
+        await this.pgClient.unsafe(ddl);
+      } catch (err) {
+        console.warn('Avertissement DDL PostgreSQL (statement ignoré):', err);
+      }
     }
   }
 
@@ -207,7 +221,11 @@ export class SqliteService implements OnModuleInit {
       // Ignore PRAGMA errors on restricted filesystems
     }
     for (const ddl of SCHEMA_DDL_STATEMENTS) {
-      this.sqliteClient.run(ddl);
+      try {
+        this.sqliteClient.run(ddl);
+      } catch (err) {
+        console.warn('Avertissement DDL SQLite:', err);
+      }
     }
   }
 }
