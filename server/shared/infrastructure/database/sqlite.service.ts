@@ -165,14 +165,19 @@ export class SqliteService implements OnModuleInit {
           pgUrl.includes('supabase.co') ||
           Boolean(process.env.VERCEL);
 
-        this.pgClient = postgres(pgUrl, {
+        const pgFactory = typeof postgres === 'function' ? postgres : (postgres as any)?.default || postgres;
+
+        this.pgClient = pgFactory(pgUrl, {
           ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
           max: process.env.VERCEL ? 3 : 10,
           idle_timeout: 20,
           connect_timeout: 10,
           prepare: false,
         });
-        this.pgOrm = drizzle(this.pgClient, { schema });
+
+        if (this.pgClient) {
+          this.pgOrm = drizzle(this.pgClient, { schema });
+        }
       } catch (err) {
         console.error('Erreur lors de l’initialisation du client PostgreSQL:', err);
       }

@@ -10,8 +10,20 @@ import type {
 } from '../domain/models';
 import { emitDatabaseMutation } from '../../features/dashboard/hooks/useDashboardMetrics';
 
+function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return '';
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const baseUrl = getApiBaseUrl();
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fullUrl = `${baseUrl}${cleanPath}`;
+
+  const response = await fetch(fullUrl, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
