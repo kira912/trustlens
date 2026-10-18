@@ -121,6 +121,47 @@ export interface TextAnalysisResponse {
   recommendations: string[];
 }
 
+export interface PhoneAnalysisResponse {
+  phone: string;
+  e164Format: string;
+  lineType: string;
+  carrier?: string;
+  score: number;
+  riskLevel: RiskLevel;
+  matchingReportsCount: number;
+  redFlags: RedFlag[];
+  warningFlags: WarningFlag[];
+  safeFlags: SafeFlag[];
+  recommendations: string[];
+  details: string[];
+}
+
+export interface EmailAnalysisResponse {
+  email: string;
+  reputation: string;
+  score: number;
+  riskLevel: RiskLevel;
+  matchingReportsCount: number;
+  redFlags: RedFlag[];
+  warningFlags: WarningFlag[];
+  safeFlags: SafeFlag[];
+  recommendations: string[];
+  details: string[];
+}
+
+export interface CryptoAnalysisResponse {
+  address: string;
+  chain: string;
+  score: number;
+  riskLevel: RiskLevel;
+  matchingReportsCount: number;
+  redFlags: RedFlag[];
+  warningFlags: WarningFlag[];
+  safeFlags: SafeFlag[];
+  recommendations: string[];
+  details: string[];
+}
+
 export interface CompanyResult {
   siren: string;
   siretSiege?: string;

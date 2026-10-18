@@ -1,6 +1,6 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
-import { RDAP_GATEWAY, WEB_SCRAPER_GATEWAY } from '../domain/inspection.ports';
-import type { IRdapGateway, IWebScraperGateway } from '../domain/inspection.ports';
+import { Inject, Injectable, Optional, BadRequestException } from '@nestjs/common';
+import { RDAP_GATEWAY, WEB_SCRAPER_GATEWAY, PHISHING_THREAT_GATEWAY } from '../domain/inspection.ports';
+import type { IRdapGateway, IWebScraperGateway, IPhishingThreatGateway } from '../domain/inspection.ports';
 import { SCAM_REPORT_REPOSITORY } from '../../community-watch/domain/scam-report.repository';
 import type { IScamReportRepository } from '../../community-watch/domain/scam-report.repository';
 import { evaluateDomainPhishing } from '../domain/rules/phishing-rules';
@@ -16,7 +16,8 @@ export class AnalyzeUrlUseCase {
   constructor(
     @Inject(RDAP_GATEWAY) private readonly rdapGateway: IRdapGateway,
     @Inject(WEB_SCRAPER_GATEWAY) private readonly webScraper: IWebScraperGateway,
-    @Inject(SCAM_REPORT_REPOSITORY) private readonly reportRepo: IScamReportRepository
+    @Inject(SCAM_REPORT_REPOSITORY) private readonly reportRepo: IScamReportRepository,
+    @Optional() @Inject(PHISHING_THREAT_GATEWAY) private readonly phishingThreatGateway?: IPhishingThreatGateway
   ) {}
 
   async execute(rawUrl?: string, listingContext?: ListingContextInput) {
@@ -83,10 +84,23 @@ export class AnalyzeUrlUseCase {
       });
     }
 
-    const [rdapInfo, scrape] = await Promise.all([
+    const [rdapInfo, scrape, phishingThreat] = await Promise.all([
       this.rdapGateway.lookupDomain(hostname),
       this.webScraper.inspectUrl(formattedUrl),
+      this.phishingThreatGateway
+        ? this.phishingThreatGateway.checkPhishingThreat(formattedUrl, hostname)
+        : Promise.resolve(null),
     ]);
+
+    if (phishingThreat && phishingThreat.isListed) {
+      score -= 85;
+      redFlags.push({
+        type: 'EXTERNAL_PHISHING_DATABASE',
+        severity: 'CRITICAL',
+        title: `🚨 Site listé dans la base anti-phishing (${phishingThreat.source})`,
+        detail: phishingThreat.details || 'URL signalée comme menace de Phishing dans les bases de sécurité internationales.',
+      });
+    }
 
     if (rdapInfo && rdapInfo.ageDays !== null) {
       if (rdapInfo.ageDays < 15) {

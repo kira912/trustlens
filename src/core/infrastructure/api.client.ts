@@ -1,6 +1,9 @@
 import type {
   UrlAnalysisResponse,
   TextAnalysisResponse,
+  PhoneAnalysisResponse,
+  EmailAnalysisResponse,
+  CryptoAnalysisResponse,
   SirenSearchResponse,
   ScamReport,
   CreateReportPayload,
@@ -52,6 +55,33 @@ export const apiClient = {
     });
   },
 
+  async analyzePhone(phone: string): Promise<PhoneAnalysisResponse> {
+    const res = await request<PhoneAnalysisResponse>('/api/analyze-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+    emitDatabaseMutation();
+    return res;
+  },
+
+  async analyzeEmail(email: string): Promise<EmailAnalysisResponse> {
+    const res = await request<EmailAnalysisResponse>('/api/analyze-email', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    emitDatabaseMutation();
+    return res;
+  },
+
+  async analyzeCrypto(address: string): Promise<CryptoAnalysisResponse> {
+    const res = await request<CryptoAnalysisResponse>('/api/analyze-crypto', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+    emitDatabaseMutation();
+    return res;
+  },
+
   async verifySiren(query: string): Promise<SirenSearchResponse> {
     const res = await request<SirenSearchResponse>(`/api/verify-siren?q=${encodeURIComponent(query)}`);
     emitDatabaseMutation();
@@ -91,3 +121,4 @@ export const apiClient = {
     return request<{ scans: ScanRecord[] }>(`/api/scans/recent?limit=${limit}`);
   },
 };
+
